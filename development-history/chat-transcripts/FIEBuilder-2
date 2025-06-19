@@ -1,0 +1,601 @@
+import React, { useState, useEffect } from 'react';
+import { Save, FileText, Download, Plus, ChevronDown, ChevronRight, Edit3, Eye, Settings, User, Calendar, ClipboardList, Brain, Heart, MessageSquare, BookOpen, Activity, Award, Home, Users, AlertCircle } from 'lucide-react';
+
+const FIEBuilder = () => {
+  const [currentStudent, setCurrentStudent] = useState(null);
+  const [activeSection, setActiveSection] = useState('current-eligibility');
+  const [completedSections, setCompletedSections] = useState(new Set());
+  const [sectionData, setSectionData] = useState({});
+  const [checkboxSelections, setCheckboxSelections] = useState({});
+  const [textInputs, setTextInputs] = useState({});
+  const [expandedCategories, setExpandedCategories] = useState(new Set(['basic']));
+
+  // Sample student data for demo
+  const sampleStudents = [
+    { id: 1, name: 'Sarah Johnson', grade: '3rd', campus: 'Roosevelt Elementary', referralDate: '2025-01-15', eligibility: 'Initial Evaluation' },
+    { id: 2, name: 'Marcus Williams', grade: '7th', campus: 'Lincoln Middle', referralDate: '2025-02-01', eligibility: 'Re-evaluation' },
+    { id: 3, name: 'Emily Chen', grade: '5th', campus: 'Washington Elementary', referralDate: '2025-02-10', eligibility: 'Initial Evaluation' }
+  ];
+
+  // FIE Sections based on GitHub documentation
+  const fieSections = {
+    basic: {
+      title: 'Basic Information',
+      icon: User,
+      sections: [
+        { id: 'multidisciplinary-team', title: 'Multidisciplinary Team Members', required: true, template: 'Team Members' },
+        { id: 'reason-referral', title: 'Reason for Referral', required: true, template: 'Reason for Referral' },
+        { id: 'other-information', title: 'Other Information', required: true, template: '3Other Information.docx' },
+        { id: 'current-eligibility', title: 'Current Eligibility', required: true, template: '4Current Eligibility.docx' },
+        { id: 'evaluation-purpose', title: 'Evaluation Purpose', required: true, template: '2Evaluation Purpose.docx' },
+        { id: 'standard-procedures', title: 'Standard Measurement Procedures', required: true, template: 'Standard Procedures' },
+        { id: 'translator', title: 'Translator Use', required: false, template: 'Translator Section' },
+        { id: 'reed', title: 'Review of Existing Evaluation Data', required: true, template: 'REED Section' }
+      ]
+    },
+    background: {
+      title: 'Background & Communication',
+      icon: FileText,
+      sections: [
+        { id: 'speech-language', title: 'Speech and Language', required: false, template: 'Speech/Language Section' },
+        { id: 'telpas', title: 'TELPAS', required: false, template: 'TELPAS.docx' },
+        { id: 'physical', title: 'Physical/Developmental History', required: true, template: 'Physical Section' },
+        { id: 'sociological', title: 'Sociological', required: true, template: 'Sociological Section' },
+        { id: 'educational-history', title: 'Educational History', required: true, template: 'Educational History' }
+      ]
+    },
+    assessment: {
+      title: 'Assessment Components',
+      icon: Brain,
+      sections: [
+        { id: 'fie-components', title: 'FIE Components', required: true, template: 'FIE Components.docx' },
+        { id: 'cognitive', title: 'Cognitive Assessment', required: false, template: 'Cognitive Assessment Template' },
+        { id: 'achievement', title: 'Academic Achievement', required: false, template: 'ACADEMIC - WJ ACHIEVEMENT TEMPLATE.docx' },
+        { id: 'speech-language-assess', title: 'Speech and Language', required: false, template: 'Speech and Language.docx' },
+        { id: 'telpas-assess', title: 'TELPAS (ELL)', required: false, template: 'TELPAS.docx' }
+      ]
+    },
+    behavioral: {
+      title: 'Behavioral/Emotional Assessment',
+      icon: Heart,
+      sections: [
+        { id: 'emotional-behavioral', title: 'Emotional/Behavioral', required: true, template: 'Emotional/Behavioral Section' },
+        { id: 'observations', title: 'Observations', required: true, template: 'Observation Templates' },
+        { id: 'rating-scales', title: 'Rating Scales', required: false, template: 'Rating Scale Templates' },
+        { id: 'fba', title: 'Functional Behavior Assessment', required: false, template: 'FBA Template' },
+        { id: 'bip', title: 'Behavior Intervention Plan', required: false, template: 'BIP Template' },
+        { id: 'counseling-eval', title: 'Counseling Evaluation', required: false, template: 'Counseling Section' },
+        { id: 'social-skills', title: 'Social Skills Summary', required: false, template: 'Social Skills Section' }
+      ]
+    },
+    interviews: {
+      title: 'Interviews & Input',
+      icon: MessageSquare,
+      sections: [
+        { id: 'parent-interview', title: 'Parent-Teacher Interviews', required: true, template: '14Parent-Teacher Interview Questions.docx' },
+        { id: 'student-interview', title: 'Student Interview', required: false, template: '15Student Information - Interview Template.docx' },
+        { id: 'other-info', title: 'Other Information', required: false, template: '3Other Information.docx' }
+      ]
+    },
+    specialized: {
+      title: 'Specialized Assessments',
+      icon: Activity,
+      sections: [
+        { id: 'ados', title: 'ADOS-2 (Autism)', required: false, template: '18Autism Diagnostic Observation Schedule.docx' },
+        { id: 'ados-module2', title: 'ADOS-2 Module 2', required: false, template: 'ADOS 2 Module 2.doc' },
+        { id: 'ados-module3', title: 'ADOS-2 Module 3', required: false, template: 'ADOS 2 Module 3.docx' },
+        { id: 'ados-module4', title: 'ADOS-2 Module 4', required: false, template: 'ADOS 2 Module 4.doc' }
+      ]
+    }
+  };
+
+  useEffect(() => {
+    if (sampleStudents.length > 0 && !currentStudent) {
+      setCurrentStudent(sampleStudents[0]);
+    }
+  }, []);
+
+  const toggleCategory = (categoryId) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(categoryId)) {
+      newExpanded.delete(categoryId);
+    } else {
+      newExpanded.add(categoryId);
+    }
+    setExpandedCategories(newExpanded);
+  };
+
+  const selectSection = (sectionId) => {
+    setActiveSection(sectionId);
+  };
+
+  const markSectionComplete = (sectionId) => {
+    const newCompleted = new Set(completedSections);
+    newCompleted.add(sectionId);
+    setCompletedSections(newCompleted);
+  };
+
+  const getSectionStatus = (sectionId) => {
+    if (completedSections.has(sectionId)) return 'complete';
+    if (sectionData[sectionId]) return 'in-progress';
+    return 'not-started';
+  };
+
+  const getStatusIcon = (sectionId) => {
+    const status = getSectionStatus(sectionId);
+    if (status === 'complete') return '●';
+    if (status === 'in-progress') return '◐';
+    return '○';
+  };
+
+  const getStatusColor = (sectionId) => {
+    const status = getSectionStatus(sectionId);
+    if (status === 'complete') return 'text-green-600';
+    if (status === 'in-progress') return 'text-yellow-600';
+    return 'text-gray-400';
+  };
+
+  const updateTextInput = (sectionId, inputId, value) => {
+    setTextInputs(prev => ({
+      ...prev,
+      [sectionId]: {
+        ...prev[sectionId],
+        [inputId]: value
+      }
+    }));
+  };
+
+  const updateCheckboxSelection = (sectionId, checkboxId, checked) => {
+    setCheckboxSelections(prev => ({
+      ...prev,
+      [sectionId]: {
+        ...prev[sectionId],
+        [checkboxId]: checked
+      }
+    }));
+    
+    // Clear text input if checkbox is unchecked
+    if (!checked) {
+      setTextInputs(prev => ({
+        ...prev,
+        [sectionId]: {
+          ...prev[sectionId],
+          [checkboxId]: ''
+        }
+      }));
+    }
+  };
+
+  const getCurrentEligibilityContent = () => {
+    const selections = checkboxSelections['current-eligibility'] || {};
+    
+    return {
+      checkboxes: {
+        // Eligibility Status
+        newReferral: selections.newReferral || false,
+        reevaluation: selections.reevaluation || false,
+        
+        // Previous Eligibility Categories
+        sld: selections.sld || false,
+        sldBasicReading: selections.sldBasicReading || false,
+        sldReadingFluency: selections.sldReadingFluency || false,
+        sldReadingComprehension: selections.sldReadingComprehension || false,
+        sldBasicMath: selections.sldBasicMath || false,
+        sldMathCalculation: selections.sldMathCalculation || false,
+        sldMathProblemSolving: selections.sldMathProblemSolving || false,
+        sldWrittenExpression: selections.sldWrittenExpression || false,
+        
+        intellectualDisability: selections.intellectualDisability || false,
+        emotionalDisturbance: selections.emotionalDisturbance || false,
+        otherHealthImpairment: selections.otherHealthImpairment || false,
+        autism: selections.autism || false,
+        orthopedicImpairment: selections.orthopedicImpairment || false,
+        
+        sli: selections.sli || false,
+        sliArticulation: selections.sliArticulation || false,
+        sliVoice: selections.sliVoice || false,
+        sliFluency: selections.sliFluency || false,
+        sliLanguage: selections.sliLanguage || false,
+        
+        oralExpression: selections.oralExpression || false
+      }
+    };
+  };
+
+  const getActiveSection = () => {
+    for (const category of Object.values(fieSections)) {
+      const section = category.sections.find(s => s.id === activeSection);
+      if (section) return section;
+    }
+    return null;
+  };
+
+  const renderCurrentEligibilitySection = () => {
+    const selections = checkboxSelections['current-eligibility'] || {};
+    const textValues = textInputs['current-eligibility'] || {};
+    
+    const CheckboxWithTextInput = ({ id, label, description, placeholder, children }) => (
+      <div className="space-y-3">
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={selections[id] || false}
+            onChange={(e) => updateCheckboxSelection('current-eligibility', id, e.target.checked)}
+            className="mt-1 h-4 w-4 text-blue-600 rounded border-gray-300"
+          />
+          <div className="flex-1">
+            <span className="font-medium">{label}</span>
+            <p className="text-sm text-gray-600">{description}</p>
+          </div>
+        </label>
+        
+        {selections[id] && (
+          <div className="ml-7 transition-all duration-200">
+            <textarea
+              value={textValues[id] || ''}
+              onChange={(e) => updateTextInput('current-eligibility', id, e.target.value)}
+              placeholder={placeholder || `Additional details for ${label}...`}
+              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              rows="3"
+            />
+          </div>
+        )}
+        
+        {children}
+      </div>
+    );
+    
+    return (
+      <div className="space-y-6">
+        {/* Eligibility Status */}
+        <div className="bg-white p-6 rounded-lg border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Eligibility Status</h3>
+          <p className="text-gray-700 mb-4">[Student Name] is being evaluated to determine eligibility for special education services.</p>
+          
+          <div className="space-y-4">
+            <CheckboxWithTextInput
+              id="newReferral"
+              label="New Referral"
+              description="This evaluation represents an initial referral under the Individuals with Disabilities Education Act (IDEA) to determine [Student Name]'s eligibility for special education services."
+              placeholder="Additional context about the new referral (optional)..."
+            />
+            
+            <CheckboxWithTextInput
+              id="reevaluation"
+              label="Reevaluation"
+              description="This evaluation is a reevaluation to determine if [Student Name] continues to meet eligibility criteria for special education services and to review the need for continued support or changes in services."
+              placeholder="Details about previous evaluation date, changes in needs, etc..."
+            />
+          </div>
+        </div>
+
+        {/* Previous Evaluation Data */}
+        <div className="bg-white p-6 rounded-lg border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Previous Evaluation Data</h3>
+          <p className="text-gray-700 mb-4">The most recent Full and Individual Evaluation (FIE) for [Student Name] was completed on [Insert Date]. The evaluation concluded that [Student Name] met eligibility criteria under the following categories as defined by IDEA and TEA guidelines:</p>
+          
+          {/* Specific Learning Disability */}
+          <div className="mb-6">
+            <CheckboxWithTextInput
+              id="sld"
+              label="Specific Learning Disability (SLD)"
+              description="[Student Name] met eligibility criteria for SLD in the following areas:"
+              placeholder="Overall SLD determination details, assessment data used, etc..."
+            >
+              {selections.sld && (
+                <div className="ml-7 space-y-3 mt-4 transition-all duration-200">
+                  {[
+                    { id: 'sldBasicReading', label: 'Basic Reading Skills', desc: 'Evidence of difficulty with decoding, phonemic awareness, or word recognition as indicated by classroom performance, assessments, or progress monitoring.', placeholder: 'Specific reading assessments, DIBELS scores, classroom data...' },
+                    { id: 'sldReadingFluency', label: 'Reading Fluency', desc: 'Significant delays in reading fluency, as demonstrated by classroom performance and assessment data.', placeholder: 'Fluency rates, CBM data, oral reading assessments...' },
+                    { id: 'sldReadingComprehension', label: 'Reading Comprehension', desc: 'Difficulty with understanding and interpreting texts, as supported by assessment data and teacher observations.', placeholder: 'Comprehension assessment results, strategy use, teacher reports...' },
+                    { id: 'sldBasicMath', label: 'Basic Math Skills', desc: 'Foundational math deficits identified through classroom-based assessments and progress monitoring.', placeholder: 'Math fact fluency, number sense assessments, grade-level expectations...' },
+                    { id: 'sldMathCalculation', label: 'Math Calculation', desc: 'Difficulty with math calculations, as reported through teacher input, classroom performance, and assessment data.', placeholder: 'Calculation assessments, error patterns, computational skills...' },
+                    { id: 'sldMathProblemSolving', label: 'Math Problem Solving', desc: 'Struggles with multi-step problem-solving, as observed in classwork and assessments.', placeholder: 'Problem-solving strategies, mathematical reasoning, application skills...' },
+                    { id: 'sldWrittenExpression', label: 'Written Expression', desc: 'Weaknesses in writing clarity, organization, and task completion, affecting classroom performance.', placeholder: 'Writing samples, organization skills, mechanics, content development...' }
+                  ].map(item => (
+                    <CheckboxWithTextInput
+                      key={item.id}
+                      id={item.id}
+                      label={item.label}
+                      description={item.desc}
+                      placeholder={item.placeholder}
+                    />
+                  ))}
+                </div>
+              )}
+            </CheckboxWithTextInput>
+          </div>
+
+          {/* Other Eligibility Categories */}
+          <div className="space-y-4">
+            {[
+              { id: 'intellectualDisability', label: 'Intellectual Disability (ID)', desc: '[Student Name] met criteria for Intellectual Disability (ID) based on below-average cognitive functioning and adaptive behavior deficits that impact educational performance.', placeholder: 'Cognitive assessment results, adaptive behavior data, educational impact...' },
+              { id: 'emotionalDisturbance', label: 'Emotional Disturbance (ED)', desc: '[Student Name] met criteria for Emotional Disturbance (ED) based on characteristics including inability to learn, difficulty forming relationships, inappropriate behavior or feelings, pervasive mood of unhappiness, or development of physical symptoms or fears.', placeholder: 'Behavioral observations, rating scales, duration of concerns, educational impact...' },
+              { id: 'otherHealthImpairment', label: 'Other Health Impairment (OHI)', desc: '[Student Name] met criteria for OHI, which includes chronic or acute health conditions such as ADHD, diabetes, epilepsy that limit strength, vitality, or alertness and adversely impact educational performance.', placeholder: 'Medical diagnosis, physician reports, educational impact, attention/alertness data...' },
+              { id: 'autism', label: 'Autism (AU)', desc: '[Student Name] met criteria for Autism (AU) due to the presence of communication deficits, social interaction challenges, and repetitive behaviors that impact educational performance.', placeholder: 'ADOS results, communication assessments, social observations, repetitive behaviors...' },
+              { id: 'orthopedicImpairment', label: 'Orthopedic Impairment (OI)', desc: '[Student Name] met criteria for Orthopedic Impairment (OI), which includes physical impairments that affect participation in educational activities.', placeholder: 'Medical reports, physical therapy evaluations, educational accommodations needed...' }
+            ].map(item => (
+              <CheckboxWithTextInput
+                key={item.id}
+                id={item.id}
+                label={item.label}
+                description={item.desc}
+                placeholder={item.placeholder}
+              />
+            ))}
+          </div>
+
+          {/* Speech or Language Impairment */}
+          <div className="mt-6">
+            <CheckboxWithTextInput
+              id="sli"
+              label="Speech or Language Impairment (SLI)"
+              description="[Student Name] met eligibility for SLI in the following area(s):"
+              placeholder="Overall SLI determination, speech-language evaluation summary..."
+            >
+              {selections.sli && (
+                <div className="ml-7 space-y-3 mt-4 transition-all duration-200">
+                  {[
+                    { id: 'sliArticulation', label: 'Articulation', desc: 'Difficulty with speech sound production that impacts intelligibility in conversations and oral academic tasks.', placeholder: 'Specific sound errors, intelligibility ratings, impact on communication...' },
+                    { id: 'sliVoice', label: 'Voice', desc: 'Abnormalities in pitch, resonance, or vocal quality that affect classroom communication.', placeholder: 'Voice quality characteristics, pitch concerns, resonance issues...' },
+                    { id: 'sliFluency', label: 'Fluency', desc: 'Disruptions in speech fluency, such as stuttering, which affect [Student Name]\'s oral participation in class.', placeholder: 'Dysfluency types, frequency, secondary behaviors, impact on participation...' },
+                    { id: 'sliLanguage', label: 'Language', desc: 'Difficulty with receptive or expressive language, limiting [his/her/their] ability to understand or express ideas effectively.', placeholder: 'Language assessment results, receptive/expressive skills, pragmatic language...' }
+                  ].map(item => (
+                    <CheckboxWithTextInput
+                      key={item.id}
+                      id={item.id}
+                      label={item.label}
+                      description={item.desc}
+                      placeholder={item.placeholder}
+                    />
+                  ))}
+                </div>
+              )}
+            </CheckboxWithTextInput>
+          </div>
+
+          {/* Oral Expression */}
+          <div className="mt-4">
+            <CheckboxWithTextInput
+              id="oralExpression"
+              label="Oral Expression"
+              description="[Student Name] has significant difficulty with oral expression, including challenges in organizing and generating spoken language, which affects classroom participation."
+              placeholder="Oral expression assessments, language sample analysis, classroom observations..."
+            />
+          </div>
+        </div>
+
+        {/* Summary */}
+        <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Summary of Current Eligibility</h3>
+          <p className="text-gray-700">The results of this evaluation will support the Admission, Review, and Dismissal (ARD) Committee in determining [Student Name]'s eligibility for special education services and developing an appropriate educational program. The evaluation is compliant with the requirements of the Individuals with Disabilities Education Act (IDEA) and Texas Education Agency (TEA) guidelines.</p>
+        </div>
+
+        {/* AI Processing Instructions */}
+        <div className="bg-yellow-50 p-6 rounded-lg border border-yellow-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">📝 AI Processing Instructions</h3>
+          <p className="text-gray-700 mb-3"><strong>For ChatGPT/Claude:</strong> Generate a legally defensible narrative for the 'Current Eligibility' section of a Full and Individual Evaluation (FIE). The narrative should:</p>
+          <ul className="text-sm text-gray-600 space-y-1 ml-4">
+            <li>• Use the student's name instead of '[Student Name]'</li>
+            <li>• Replace all placeholders with actual information</li>
+            <li>• Incorporate user-provided text from expandable boxes</li>
+            <li>• Follow Texas Education Agency (TEA) guidelines</li>
+            <li>• Use formal, professional tone</li>
+            <li>• Remove any editorialized content</li>
+            <li>• Ensure legal defensibility per IDEA requirements</li>
+            <li>• Reference Michael Hass & Jeanne Anne Carriere's standards for psychoeducational reports</li>
+          </ul>
+        </div>
+      </div>
+    );
+  };
+
+  const calculateProgress = () => {
+    const totalSections = Object.values(fieSections).reduce((acc, cat) => acc + cat.sections.length, 0);
+    const completedCount = completedSections.size;
+    return Math.round((completedCount / totalSections) * 100);
+  };
+
+  return (
+    <div className="h-screen bg-gray-100 flex flex-col">
+      {/* Top Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <FileText className="w-8 h-8 text-blue-600" />
+              <h1 className="text-2xl font-bold text-gray-900">ConnectEd360 FIE Builder</h1>
+            </div>
+            
+            {/* Student Selector */}
+            <div className="ml-8">
+              <select
+                value={currentStudent?.id || ''}
+                onChange={(e) => {
+                  const student = sampleStudents.find(s => s.id === parseInt(e.target.value));
+                  setCurrentStudent(student);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">Select Student</option>
+                {sampleStudents.map(student => (
+                  <option key={student.id} value={student.id}>
+                    {student.name} - {student.grade} - {student.campus}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Progress */}
+            <div className="flex items-center gap-2">
+              <div className="text-sm text-gray-600">Progress:</div>
+              <div className="w-32 bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${calculateProgress()}%` }}
+                />
+              </div>
+              <span className="text-sm font-medium text-gray-700">{calculateProgress()}%</span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                Templates
+              </button>
+              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Export FIE
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 flex">
+        {/* Left Sidebar - Section Navigation */}
+        <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto">
+          <div className="p-4">
+            <h3 className="font-semibold text-gray-900 mb-4">FIE Sections</h3>
+            
+            {Object.entries(fieSections).map(([categoryId, category]) => {
+              const CategoryIcon = category.icon;
+              const isExpanded = expandedCategories.has(categoryId);
+              
+              return (
+                <div key={categoryId} className="mb-2">
+                  {/* Category Header */}
+                  <button
+                    onClick={() => toggleCategory(categoryId)}
+                    className="w-full flex items-center justify-between p-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-2">
+                      <CategoryIcon className="w-5 h-5 text-gray-500" />
+                      <span className="font-medium">{category.title}</span>
+                    </div>
+                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </button>
+                  
+                  {/* Category Sections */}
+                  {isExpanded && (
+                    <div className="ml-4 mt-2 space-y-1">
+                      {category.sections.map(section => (
+                        <button
+                          key={section.id}
+                          onClick={() => selectSection(section.id)}
+                          className={`w-full text-left p-2 rounded-lg text-sm flex items-center gap-2 ${
+                            activeSection === section.id 
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200' 
+                              : 'text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span className={`${getStatusColor(section.id)}`}>
+                            {getStatusIcon(section.id)}
+                          </span>
+                          <span className="flex-1">{section.title}</span>
+                          {section.required && (
+                            <span className="text-red-500 text-xs">*</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Student Info Panel */}
+          {currentStudent && (
+            <div className="border-t border-gray-200 p-4 bg-gray-50">
+              <h4 className="font-medium text-gray-900 mb-2">Current Student</h4>
+              <div className="space-y-1 text-sm text-gray-600">
+                <div><strong>Name:</strong> {currentStudent.name}</div>
+                <div><strong>Grade:</strong> {currentStudent.grade}</div>
+                <div><strong>Campus:</strong> {currentStudent.campus}</div>
+                <div><strong>Referral:</strong> {currentStudent.referralDate}</div>
+                <div><strong>Type:</strong> {currentStudent.eligibility}</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col">
+          {currentStudent ? (
+            <div className="h-full flex flex-col">
+              {/* Section Header */}
+              <div className="border-b border-gray-200 p-6 bg-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                      <span className={`text-lg ${getStatusColor(activeSection)}`}>
+                        {getStatusIcon(activeSection)}
+                      </span>
+                      Current Eligibility
+                      <span className="text-red-500 text-sm">*</span>
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">Template: 4Current Eligibility.docx</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => markSectionComplete(activeSection)}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                    >
+                      <Award className="w-4 h-4" />
+                      Mark Complete
+                    </button>
+                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                      <Download className="w-4 h-4" />
+                      Export Section
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 p-6 bg-gray-50 overflow-y-auto">
+                {activeSection === 'current-eligibility' ? renderCurrentEligibilitySection() : (
+                  <div className="bg-white p-8 rounded-lg border border-gray-200 text-center">
+                    <ClipboardList className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Section Under Development</h3>
+                    <p className="text-gray-600">This section will be implemented with full template content and checkbox system.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center bg-gray-50">
+              <div className="text-center">
+                <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">Select a Student</h2>
+                <p className="text-gray-600">Choose a student from the dropdown above to begin building their FIE report.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom Status Bar */}
+      <div className="bg-white border-t border-gray-200 px-6 py-2">
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <div className="flex items-center gap-4">
+            <span>● Complete</span>
+            <span>◐ In Progress</span>
+            <span>○ Not Started</span>
+            <span className="text-red-500">* Required</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span>{completedSections.size} of {Object.values(fieSections).reduce((acc, cat) => acc + cat.sections.length, 0)} sections complete</span>
+            <span>Last saved: Never</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default FIEBuilder;
